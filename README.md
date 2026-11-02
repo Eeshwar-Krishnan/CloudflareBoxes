@@ -4,6 +4,8 @@ Run isolated Linux workspaces on Cloudflare, control them from a CLI or MCP clie
 
 > Early prototype. Has not been hardened for production use.
 
+> Everything below this was written by AI
+
 ## What it does
 
 - **Sandboxes:** create, inspect, stop, resume, fork, and delete Linux containers. Run commands with captured output and exit status.
