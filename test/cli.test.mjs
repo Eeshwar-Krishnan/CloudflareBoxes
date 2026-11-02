@@ -19,3 +19,21 @@ test('CLI forwards Access credentials and emits the documented ready event', asy
     assert.deepEqual(seen, {url:'/v1/boxes', id:'id', secret:'secret', body:{}});
   } finally { server.close(); }
 });
+
+test('CLI passes a selected instance size to the service', async () => {
+  let body;
+  const server = createServer(async (req, res) => {
+    const chunks = []; for await (const part of req) chunks.push(part);
+    body = JSON.parse(Buffer.concat(chunks));
+    res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({id:'box-1', size: body.size}));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const child = spawn(process.execPath, ['cli/cfbox.mjs', 'new', '--size', 'standard-3', '--json'], {env:{...process.env, CFBOX_URL:`http://127.0.0.1:${server.address().port}`, CF_ACCESS_CLIENT_ID:'id', CF_ACCESS_CLIENT_SECRET:'secret'}});
+    let output = ''; for await (const chunk of child.stdout) output += chunk;
+    const code = await new Promise(resolve => child.on('close', resolve));
+    assert.equal(code, 0);
+    assert.deepEqual(body, {size: 'standard-3'});
+    assert.equal(JSON.parse(output).size, 'standard-3');
+  } finally { server.close(); }
+});

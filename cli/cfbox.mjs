@@ -11,7 +11,7 @@ Environment:
   CF_ACCESS_CLIENT_SECRET       Cloudflare Access service-token client secret
 
 Commands:
-  new [--json]
+  new [--size lite|basic|standard-1|standard-2|standard-3|standard-4] [--json]
   list [--json]
   info ID [--json]             stop ID [--json]       resume ID [--json]
   fork ID [--json]             delete ID [--json]
@@ -24,6 +24,7 @@ Commands:
   artifact token ID [--scope read|write] [--ttl SECONDS]
   artifact delete ID
 
+New boxes default to standard-2 (1 vCPU, 6 GiB RAM, 12 GB disk). Forks inherit size.
 new and fork emit NDJSON, including {"event":"ready","id":"..."} on success.
 For SSH/SCP configure an Ed25519 authorized key and use Wrangler's SSH proxy:
   ssh -o ProxyCommand="wrangler containers ssh %h" cloudchamber@INSTANCE_ID
@@ -103,13 +104,10 @@ async function lifecycle(command, args) {
   let path;
   let body;
   if (command === 'new') {
-    const image = takeOption(args, '--image');
-    const ttl = takeOption(args, '--ttl');
-    const noAutoStop = takeOption(args, '--no-auto-stop', { value: false });
-    body = {};
-    if (image) body.image = image;
-    if (ttl !== undefined) body.ttl_seconds = Number(ttl);
-    if (noAutoStop) body.no_auto_stop = true;
+    const size = takeOption(args, '--size');
+    const validSizes = ['lite', 'basic', 'standard-1', 'standard-2', 'standard-3', 'standard-4'];
+    if (size && !validSizes.includes(size)) throw new Error(`invalid size: ${size}; choose ${validSizes.join(', ')}`);
+    body = size ? { size } : {};
     path = '/v1/boxes';
   } else if (command === 'list') {
     method = 'GET';

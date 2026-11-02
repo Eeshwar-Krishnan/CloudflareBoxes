@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { DEFAULT_INSTANCE_SIZE, LEGACY_INSTANCE_SIZE, isInstanceSize, type InstanceSize } from "./sizes";
 
 export interface ExecInput {
   /** Executable and arguments. Shell syntax is not interpreted automatically. */
@@ -20,14 +21,16 @@ export interface SandboxSnapshot {
   size: number;
   name?: string;
   image: string;
+  instanceSize?: InstanceSize;
 }
 
 export interface SandboxOptions {
   tenantId: string;
+  size?: InstanceSize;
   image?: string;
   /** Optional container entrypoint, passed directly to the platform. */
   entrypoint?: string[];
-  /** Internet access is opt-in and defaults to false. */
+  /** Internet access defaults to enabled. */
   enableInternet?: boolean;
   env?: Record<string, string>;
   inactivityTimeoutMs?: number;
@@ -37,6 +40,7 @@ type SandboxState = {
   id: string;
   tenantId: string;
   image: string;
+  size?: InstanceSize;
   state: "new" | "running" | "stopped" | "lost" | "deleted";
   snapshot?: SandboxSnapshot;
   createdAt: number;
@@ -97,6 +101,7 @@ export class Sandbox extends DurableObject {
   async create(options: SandboxOptions): Promise<SandboxState> {
     return this.exclusive(async () => {
       if (!options?.tenantId?.trim()) throw new TypeError("tenantId is required");
+      if (options.size !== undefined && !isInstanceSize(options.size)) throw new TypeError("Invalid instance size");
       const existing = await this.readState();
       if (existing) {
         if (existing.tenantId !== options.tenantId) throw new Error("Sandbox tenant mismatch");
@@ -106,14 +111,13 @@ export class Sandbox extends DurableObject {
       }
       const now = Date.now();
       const state: SandboxState = {
-        id: this.ctx.id.toString(), tenantId: options.tenantId, image: options.image ?? DEFAULT_IMAGE,
+        id: this.ctx.id.toString(), tenantId: options.tenantId, image: options.image ?? DEFAULT_IMAGE, size: options.size ?? DEFAULT_INSTANCE_SIZE,
         state: "new", createdAt: now, updatedAt: now, enableInternet: options.enableInternet ?? true,
       };
       await this.ctx.storage.put(STATE_KEY, state);
       this.container.start({
         image: this.container.images.workspace, entrypoint: ["sleep", "infinity"],
-        enableInternet: state.enableInternet,
-
+        enableInternet: state.enableInternet, instance: state.size ?? LEGACY_INSTANCE_SIZE,
         ...(options.env ? { env: options.env } : {}),
       });
       await this.container.setInactivityTimeout(options.inactivityTimeoutMs ?? DEFAULT_INACTIVITY_MS);
@@ -125,7 +129,7 @@ export class Sandbox extends DurableObject {
     this.container.start({
       ...(snapshot ? { containerSnapshot: { id: snapshot.id, size: snapshot.size, ...(snapshot.name ? { name: snapshot.name } : {}) } } : { image: this.container.images.workspace }),
       entrypoint: ["sleep", "infinity"],
-      enableInternet: state.enableInternet,
+      enableInternet: state.enableInternet, instance: state.size ?? LEGACY_INSTANCE_SIZE,
     });
     await this.container.setInactivityTimeout(DEFAULT_INACTIVITY_MS);
   }
@@ -191,7 +195,7 @@ export class Sandbox extends DurableObject {
       const state = this.requireLive(await this.readState());
       if (state.state !== "running" || !this.container.running) throw new Error("Sandbox must be running to fork");
       const snapshot = await this.container.snapshotContainer({ name: `fork-${state.id}-${Date.now()}` });
-      return { ...snapshot, image: state.image };
+      return { ...snapshot, image: state.image, instanceSize: state.size ?? LEGACY_INSTANCE_SIZE };
     });
   }
 
@@ -200,13 +204,14 @@ export class Sandbox extends DurableObject {
     return this.exclusive(async () => {
       if (!snapshot?.id || !Number.isFinite(snapshot.size) || !snapshot.image) throw new TypeError("Invalid snapshot handle");
       if (!options?.tenantId?.trim()) throw new TypeError("tenantId is required");
+      if (snapshot.instanceSize !== undefined && !isInstanceSize(snapshot.instanceSize)) throw new TypeError("Invalid snapshot instance size");
       const existing = await this.readState();
       if (existing) throw new Error("Snapshot can only initialize an unused sandbox");
       const image = options.image ?? snapshot.image;
       if (image !== snapshot.image) throw new Error("Snapshots can only be restored with the image that created them");
       const now = Date.now();
       const state: SandboxState = {
-        id: this.ctx.id.toString(), tenantId: options.tenantId, image, snapshot,
+        id: this.ctx.id.toString(), tenantId: options.tenantId, image, snapshot, size: snapshot.instanceSize ?? LEGACY_INSTANCE_SIZE,
         state: "new", createdAt: now, updatedAt: now, enableInternet: options.enableInternet ?? true,
       };
       await this.ctx.storage.put(STATE_KEY, state);
@@ -237,6 +242,6 @@ export class Sandbox extends DurableObject {
     const state = await this.readState();
     if (!state) return { id: this.ctx.id.toString(), state: "new" };
     if (state.state === "running" && !this.container.running) return this.writeState({ ...state, state: "lost" });
-    return state;
+    return { ...state, size: state.size ?? LEGACY_INSTANCE_SIZE };
   }
 }

@@ -50,6 +50,7 @@ export CF_ACCESS_CLIENT_ID="..."
 export CF_ACCESS_CLIENT_SECRET="..."
 
 node cli/cfbox.mjs new --json
+node cli/cfbox.mjs new --size standard-3 --json
 node cli/cfbox.mjs list --json
 node cli/cfbox.mjs exec BOX_ID -- sh -c 'node --version && git --version'
 node cli/cfbox.mjs upload BOX_ID ./notes.txt /workspace/notes.txt
@@ -59,6 +60,19 @@ node cli/cfbox.mjs resume BOX_ID
 node cli/cfbox.mjs fork BOX_ID --json
 node cli/cfbox.mjs delete BOX_ID
 ```
+
+New boxes default to **`standard-2`** (1 vCPU). Choose a different Cloudflare instance type with `--size`; a fork inherits its parent's size and resume preserves it. Boxes created before size selection retain the former `lite` default.
+
+| Size | vCPU | Memory | Disk |
+| --- | ---: | ---: | ---: |
+| `lite` | 1/16 | 256 MiB | 2 GB |
+| `basic` | 1/4 | 1 GiB | 4 GB |
+| `standard-1` | 1/2 | 4 GiB | 8 GB |
+| `standard-2` | 1 | 6 GiB | 12 GB |
+| `standard-3` | 2 | 8 GiB | 16 GB |
+| `standard-4` | 4 | 12 GiB | 20 GB |
+
+See [Cloudflare instance types](https://developers.cloudflare.com/containers/platform/limits/) for current limits. Available capacity depends on your account.
 
 `new` and `fork` emit a JSON ready event with an `id`. Commands run as argument arrays; use `sh -c` when shell syntax is needed. Pipe a script to `cfbox exec BOX_ID -- sh -s`. Run `node cli/cfbox.mjs help` for the full CLI. Uploads and downloads currently have a **64 KiB per-file limit**.
 
@@ -111,4 +125,4 @@ As of 2026-11-01, Workers Paid starts at $5/month. [Containers pricing](https://
 
 Snapshots are beta, exclude running processes and mounted filesystems, expire, and can lose changes since the last successful checkpoint. A running instance can stop unexpectedly. Commands and their output are buffered; commands do not have a hard timeout. Sandboxes have outbound Internet enabled for Git and package installation, so code can send data and credentials it can read to the network. Desktop streaming, previews, lifecycle extensions, and Docker-in-Docker are not implemented.
 
-The [upstream skills](reference/cloud-sandbox-vm-skills) describe Box workflows but do not specify its full CLI or MCP contract. CloudflareBoxes is inspired by those recipes; it does not claim wire compatibility. See [the research and design](docs/cloudflare-design.md) for the reconstructed surface and architectural tradeoffs.
+The [upstream skills](https://github.com/ariana-dot-dev/cloud-sandbox-vm-skills) describe Box workflows but do not specify its full CLI or MCP contract. CloudflareBoxes is inspired by those recipes; it does not claim wire compatibility.

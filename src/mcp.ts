@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
+import { INSTANCE_SIZES } from './sizes';
 
 type Dispatch = (method: string, path: string, body?: unknown) => Promise<unknown>;
 export async function handleMcp(request: Request, dispatch: Dispatch): Promise<Response> {
@@ -10,7 +11,7 @@ export async function handleMcp(request: Request, dispatch: Dispatch): Promise<R
     catch (e) { return { isError: true, content: [{ type: 'text' as const, text: e instanceof Error ? e.message : 'Request failed' }] }; }
   };
   const id = z.string().regex(/^[a-z0-9-]+$/);
-  server.registerTool('box_create', { description: 'Create an isolated Linux sandbox', inputSchema: {} }, () => result('POST', '/v1/boxes', {}));
+  server.registerTool('box_create', { description: 'Create an isolated Linux sandbox (default standard-2, 1 vCPU)', inputSchema: { size: z.enum(INSTANCE_SIZES).optional() } }, (args) => result('POST', '/v1/boxes', args));
   server.registerTool('box_list', { description: 'List your sandboxes', inputSchema: {} }, () => result('GET', '/v1/boxes'));
   server.registerTool('box_info', { description: 'Get sandbox state', inputSchema: { id } }, ({id}) => result('GET', `/v1/boxes/${id}`));
   for (const action of ['stop', 'resume', 'fork'] as const) server.registerTool(`box_${action}`, { description: `${action} a sandbox`, inputSchema: { id } }, ({id}) => result('POST', `/v1/boxes/${id}/${action}`, {}));

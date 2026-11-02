@@ -2,6 +2,7 @@ import { accessPrincipal } from './auth';
 import { handleMcp } from './mcp';
 import { Sandbox } from './sandbox';
 import { Registry } from './registry';
+import { DEFAULT_INSTANCE_SIZE, isInstanceSize } from './sizes';
 import { createArtifact, createArtifactToken, deleteArtifact, cleanupExpiredArtifacts, type ArtifactsBinding } from './artifacts';
 export { Sandbox, Registry };
 
@@ -34,12 +35,14 @@ async function dispatch(env: Env, principal: string, method: string, path: strin
   if (path === '/v1/boxes' && method === 'GET') return { boxes: await registry.list(tenant) };
   if (path === '/v1/boxes' && method === 'POST') {
     const input = bodyObject(body ?? {});
-    if (Object.keys(input).length) throw new HttpError(400, 'Custom image and lifetime options are not yet supported');
+    if (Object.keys(input).some(key => key !== 'size')) throw new HttpError(400, 'Only size is supported');
+    const size = input.size === undefined ? DEFAULT_INSTANCE_SIZE : input.size;
+    if (!isInstanceSize(size)) throw new HttpError(400, 'Invalid size; use lite, basic, standard-1, standard-2, standard-3, or standard-4');
     const id = crypto.randomUUID();
     const box = env.SANDBOX.getByName(`${tenant}:${id}`);
     await registry.add(tenant, id);
-    try { await box.create({tenantId: tenant}); } catch (e) { await registry.remove(tenant, id); throw e; }
-    return { id, state: 'running' };
+    try { await box.create({tenantId: tenant, size}); } catch (e) { await registry.remove(tenant, id); throw e; }
+    return { id, state: 'running', size };
   }
   const match = /^\/v1\/boxes\/([a-z0-9-]+)(?:\/(stop|resume|fork|commands|extend))?$/.exec(path);
   if (match) {
@@ -56,7 +59,7 @@ async function dispatch(env: Env, principal: string, method: string, path: strin
       const fork = env.SANDBOX.getByName(`${tenant}:${forkId}`);
       await registry.add(tenant, forkId);
       try { await fork.useSnapshot(snapshot, {tenantId: tenant}); } catch (e) { await registry.remove(tenant, forkId); throw e; }
-      return {id: forkId, state:'running'};
+      return {id: forkId, state:'running', size: snapshot.instanceSize};
     }
     if (method === 'POST' && action === 'commands') {
       const input = bodyObject(body);
