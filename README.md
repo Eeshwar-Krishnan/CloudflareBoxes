@@ -1,10 +1,8 @@
-<img src="assets/icon.svg" width="64" height="64" alt="">
-
 # CloudflareBoxes
 
-Run isolated Linux workspaces on Cloudflare, control them from a CLI or MCP client, and hand work between agents through temporary Git repositories. Cloudflare Access protects the control plane; each authenticated identity gets its own sandboxes and artifacts.
+Run isolated Linux workspaces on Cloudflare, control them from a CLI or MCP client, and hand work between agents through temporary Git repositories.
 
-> Early prototype. The live deployment has passed a basic end-to-end test, but it is not a drop-in replacement for Box and has not been hardened for production use.
+> Early prototype. Has not been hardened for production use.
 
 ## What it does
 
