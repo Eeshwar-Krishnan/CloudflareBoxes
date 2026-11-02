@@ -1,0 +1,3 @@
+[submodule "reference/cloud-sandbox-vm-skills"]
+	path = reference/cloud-sandbox-vm-skills
+	url = https://github.com/ariana-dot-dev/cloud-sandbox-vm-skills.git

@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cloudflareboxes",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "containers": [{ "class_name": "Sandbox", "scheduling_policy": "durable_object", "images": { "workspace": { "dockerfile": "./Dockerfile" } } }],
+  "durable_objects": { "bindings": [
+    { "name": "SANDBOX", "class_name": "Sandbox" },
+    { "name": "REGISTRY", "class_name": "Registry" }
+  ] },
+  "exports": { "Sandbox": { "type": "durable-object", "storage": "sqlite" }, "Registry": { "type": "durable-object", "storage": "sqlite" } },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "cloudflareboxes" }],
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": { "ACCESS_AUD": "YOUR_ACCESS_AUD", "TEAM_DOMAIN": "YOUR_TEAM_DOMAIN" }
+}
